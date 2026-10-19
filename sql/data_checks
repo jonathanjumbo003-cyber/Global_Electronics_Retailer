@@ -1,0 +1,58 @@
+-- We will check all the tables to understand our data
+
+SELECT
+  COUNT(*) AS total_rows,
+  COUNTIF(order_number IS NULL) AS missing_order_number,
+  COUNTIF(line_item IS NULL) AS missing_line_item,
+  COUNTIF(order_date IS NULL) AS missing_order_date,
+  COUNTIF(customer_key IS NULL) AS missing_customer_data,
+  COUNT(DISTINCT customer_key) AS unique_customers,
+  COUNTIF(store_key IS NULL) AS missing_store_information,
+  COUNT(DISTINCT store_key) AS unique_stores,
+  COUNTIF(product_key IS NULL) AS missing_product_data,
+  COUNT(DISTINCT product_key) AS unique_products,
+  COUNTIF(quantity IS NULL) AS missing_product_data,
+  COUNTIF(currency_code IS NULL) AS missing_currency_information
+FROM `global_electronics_retailer.sales`;
+
+-- Let's do a check on the essentials in customers
+
+SELECT
+  COUNTIF(customer_key IS NULL) AS  missing_customerkey,
+  COUNT(*) AS total_customers,
+  COUNT(DISTINCT customer_key) AS non_duplicate_customer_data,
+  COUNTIF(gender IS NULL) AS missing_gender,
+  COUNTIF(name IS NULL) AS missing_name,
+  COUNTIF(state IS NULL) AS missing_state,
+  COUNTIF(zip_code IS NULL) AS missing_zip_code,
+  COUNT(DISTINCT zip_code) AS unique_zip_code,
+  COUNTIF(country IS NULL) AS missing_country,
+  COUNTIF(continent IS NULL) AS missing_continent
+FROM global_electronics_retailer.customers;
+
+-- preliminary checks on products
+
+SELECT
+  COUNT(*) AS total_row,
+  COUNT(DISTINCT product_key) AS non_duplicate_product,
+  COUNTIF(unit_cost_usd IS NULL) AS missing_cost_data,
+  COUNTIF(unit_price_usd IS NULL) AS missing_price_data
+FROM global_electronics_retailer.products;
+
+-- Checks on exchange_rates
+
+SELECT
+  COUNTIF(er.date IS NULL) AS missing_date,
+  COUNTIF(currency IS NULL) AS missing_currency,
+  COUNTIF(exchange IS NULL) AS missing_exchange
+FROM global_electronics_retailer.exchange_rates AS er;
+
+-- Checks on stores table
+
+SELECT
+  COUNT(*) AS toal_row,
+  COUNTIF(store_key IS NULL) AS missing_store_key,
+  COUNT(DISTINCT store_key) AS unique_store_key,
+  COUNTIF(country IS NULL) AS missing_country,
+  COUNTIF(state IS NULL) AS missing_state
+FROM global_electronics_retailer.store
