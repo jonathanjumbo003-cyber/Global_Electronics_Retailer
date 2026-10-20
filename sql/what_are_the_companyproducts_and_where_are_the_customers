@@ -1,0 +1,45 @@
+-- This is gonna be interesting
+
+WITH customer_total AS (
+  SELECT
+    c.country AS country,
+    COUNT(DISTINCT s.customer_key) AS number_of_customers,
+    SUM(s.quantity) AS total_quantity
+  FROM global_electronics_retailer.sales AS s
+  INNER JOIN global_electronics_retailer.customers AS c
+    ON s.customer_key = c.customer_key
+  GROUP BY
+    c.country
+),
+customer_product_table AS (
+  SELECT
+    c.country AS country,
+    p.category AS category,
+    p.subcategory AS subcategory,
+    SUM(s.quantity) AS quantity
+  FROM global_electronics_retailer.sales AS s
+  INNER JOIN global_electronics_retailer.customers AS c
+    On s.customer_key = c.customer_key
+  INNER JOIN global_electronics_retailer.products AS p
+    ON s.product_key = p.product_key
+  GROUP BY
+    c.country,
+    p.category,
+    p.subcategory
+)
+
+SELECT
+  ct.country,
+  ct.number_of_customers,
+  cp.category,
+  cp.subcategory,
+  cp.quantity,
+  ct.total_quantity,
+  ROUND(SAFE_DIVIDE(cp.quantity, ct.total_quantity) * 100, 2) AS pct_of_country_unit
+FROM customer_total AS ct
+INNER JOIN customer_product_table AS cp
+  On ct.country = cp.country
+ORDER BY
+  ct.total_quantity DESC,
+  ct.country,
+  pct_of_country_unit DESC
