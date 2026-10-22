@@ -1,0 +1,86 @@
+-- Comparing order volumes of different years
+
+WITH year_month_order_volume AS (
+  SELECT
+    EXTRACT(YEAR FROM order_date) AS years,
+    EXTRACT(MONTH FROM order_date) AS months,
+    COUNT(DISTINCT order_number) AS order_volume
+  FROM global_electronics_retailer.sales
+  WHERE
+    order_date IS NOT NULL
+  GROUP BY
+    years,
+    months
+),
+year_total_order AS (
+  SELECT
+    years,
+    SUM(order_volume) AS total_order
+  FROM year_month_order_volume
+  GROUP BY
+    years
+)
+
+SELECT
+  ym.years,
+  ym.months,
+  ym.order_volume,
+  yt.total_order,
+  ROUND(SAFE_DIVIDE(ym.order_volume, yt.total_order) * 100, 2) AS pct_contribution
+FROM year_month_order_volume AS ym
+INNER JOIN year_total_order AS yt
+  ON ym.years = yt.years
+WHERE
+  ym.years BETWEEN 2016 AND 2020
+ORDER BY
+  ym.years,
+  ym.months;
+
+-- Comparing revenue acroos the years
+
+WITH price_table AS (
+  SELECT
+    s.order_number AS order_number,
+    s.order_date AS order_date,
+    s.quantity AS quantity,
+    p.unit_price_usd AS price,
+    s.quantity * p.unit_price_usd AS order_price
+  FROM global_electronics_retailer.sales AS s
+  INNER JOIN global_electronics_retailer.products AS p
+    ON s.product_key = p.product_key
+  WHERE
+    S.order_date IS NOT NULL
+),
+year_month_revenue AS (
+  SELECT
+    EXTRACT(YEAR FROM pt.order_date) AS years,
+    EXTRACT(MONTH FROM pt.order_date) AS months,
+    SUM(PT.order_price) AS revenue
+  FROM price_table AS pt
+  GROUP BY
+    years,
+    months
+),
+years_revenue AS (
+  SELECT
+    EXTRACT(YEAR FROM pt.order_date) AS years,
+    SUM(order_price) AS total_revenue
+  FROM price_table AS pt
+  GROUP BY
+    years
+)
+
+SELECT
+  ym.years,
+  ym.months,
+  ym.revenue,
+  yr.total_revenue,
+  ROUND(SAFE_DIVIDE(ym.revenue, yr.total_revenue) * 100, 2) AS pct_contribution
+FROM year_month_revenue AS ym
+INNER JOIN years_revenue AS yr
+  ON ym.years = yr.years
+WHERE
+  ym.years BETWEEN 2016 AND 2020
+ORDER BY
+  ym.years,
+  ym.months
