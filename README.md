@@ -120,4 +120,107 @@ The results also showed that countries with more purchasing customers did not al
 
 These findings describe **sales volume rather than revenue or profitability**. Further analysis of product prices, costs, and currencies would be required to determine which products and markets contribute most to the company's financial performance.
 
+### 2. Seasonal Patterns and Trends in Order Volume and Revenue
+
+To investigate whether the business experienced seasonal patterns or trends, I analyzed monthly order volume and estimated revenue from 2016 to 2020. I grouped sales by year and month, compared annual totals, and calculated each month's percentage contribution to its annual total.
+
+```sql
+-- Comparing revenue acroos the years
+
+WITH price_table AS (
+  SELECT
+    s.order_number AS order_number,
+    s.order_date AS order_date,
+    s.quantity AS quantity,
+    p.unit_price_usd AS price,
+    s.quantity * p.unit_price_usd AS order_price
+  FROM global_electronics_retailer.sales AS s
+  INNER JOIN global_electronics_retailer.products AS p
+    ON s.product_key = p.product_key
+  WHERE
+    S.order_date IS NOT NULL
+),
+year_month_revenue AS (
+  SELECT
+    EXTRACT(YEAR FROM pt.order_date) AS years,
+    EXTRACT(MONTH FROM pt.order_date) AS months,
+    SUM(PT.order_price) AS revenue
+  FROM price_table AS pt
+  GROUP BY
+    years,
+    months
+),
+years_revenue AS (
+  SELECT
+    EXTRACT(YEAR FROM pt.order_date) AS years,
+    SUM(order_price) AS total_revenue
+  FROM price_table AS pt
+  GROUP BY
+    years
+)
+
+SELECT
+  ym.years,
+  ym.months,
+  ROUND(ym.revenue, 2),
+  ROUND(yr.total_revenue, 2),
+  ROUND(SAFE_DIVIDE(ym.revenue, yr.total_revenue) * 100, 2) AS pct_contribution
+FROM year_month_revenue AS ym
+INNER JOIN years_revenue AS yr
+  ON ym.years = yr.years
+WHERE
+  ym.years BETWEEN 2016 AND 2020
+ORDER BY
+  ym.years,
+  ym.months
+```
+
+For the revenue analysis, I estimated sales value by multiplying the quantity sold by the listed USD unit price of each product.
+
+#### Annual Order Volume and Revenue Trends
+
+| Year | Total Orders | Order Volume Change | Estimated Revenue (USD) | Revenue Change |
+|---|---:|---:|---:|---:|
+| 2016 | 2,865 | — | $6,946,793.56 | — |
+| 2017 | 3,280 | +14.49% | $7,421,422.27 | +6.83% |
+| 2018 | 5,965 | +81.86% | $12,788,960.66 | +72.32% |
+| 2019 | 9,083 | +52.27% | $18,264,382.48 | +42.81% |
+| 2020 | 4,635 | -48.97% | $9,294,632.14 | -49.11% |
+
+**Key findings:**
+
+- Order volume and estimated revenue increased overall between 2016 and 2019.
+- The strongest annual growth occurred in 2018, when order volume increased by 81.86% and estimated revenue grew by 72.32%.
+- In 2019, both measures reached their highest annual totals within the period analyzed, with 9,083 orders and approximately $18.26 million in estimated revenue.
+- In 2020, order volume fell by 48.97%, while estimated revenue declined by 49.11%. The similar declines suggest that the reduction in order volume was closely associated with the decline in estimated revenue.
+
+#### Monthly Contribution to Annual Order Volume and Revenue
+
+To compare monthly performance across years with different annual totals, I calculated each month's percentage contribution to the corresponding year's total.
+
+| Year | April Order Share | December Order Share | April Revenue Share | December Revenue Share |
+|---|---:|---:|---:|---:|
+| 2016 | 1.43% | 14.97% | 1.59% | 14.37% |
+| 2017 | 0.79% | 16.74% | 0.79% | 17.34% |
+| 2018 | 0.72% | 18.26% | 0.55% | 16.28% |
+| 2019 | 0.83% | 13.76% | 0.82% | 13.56% |
+| 2020 | 1.73% | 6.86% | 2.34% | 7.01% |
+
+**Key findings:**
+
+- **December was a recurring peak between 2016 and 2019.** It contributed between 13.76% and 18.26% of annual order volume and between 13.56% and 17.34% of annual estimated revenue during these years.
+- **April was consistently a low-volume month.** Its contribution remained below 1.5% of annual orders and below 1.6% of annual estimated revenue from 2016 through 2019.
+- The similar patterns in order volume and estimated revenue suggest that the December peaks and April troughs were not limited to the number of orders; they were also reflected in the estimated value of sales.
+- The pattern changed considerably in 2020. December contributed only 6.86% of annual orders and 7.01% of estimated revenue, while January and February together accounted for 46.41% of annual orders and 46.22% of estimated revenue.
+
+#### Conclusion
+
+The analysis identified recurring monthly patterns in both order volume and estimated revenue from 2016 to 2019. December consistently represented a strong month, while April contributed a relatively small share of annual activity.
+
+Order volume and estimated revenue also followed similar annual trends, growing through 2019 before declining sharply in 2020. The 2020 results differed from the earlier monthly pattern, indicating that the observed seasonal behavior was not consistent throughout the entire period.
+
+These findings suggest possible seasonality in the business, particularly during 2016–2019. However, the analysis identifies patterns rather than their causes; further investigation would be needed to establish why these changes occurred.
+
+**Note:** Revenue in this analysis is estimated using quantity multiplied by the listed USD unit price. It should not be interpreted as confirmed actual revenue because transaction-specific prices, discounts, and other adjustments were not incorporated.
+
 
