@@ -223,4 +223,112 @@ These findings suggest possible seasonality in the business, particularly during
 
 **Note:** Revenue in this analysis is estimated using quantity multiplied by the listed USD unit price. It should not be interpreted as confirmed actual revenue because transaction-specific prices, discounts, and other adjustments were not incorporated.
 
+### 3. Average Delivery Time and Changes Over Time
+
+```sql
+-- Change in average delivery time over time
+
+WITH order_delivery AS (
+  SELECT DISTINCT
+    order_number,
+    order_date,
+    delivery_date,
+    DATE_DIFF(delivery_date, order_date, DAY) AS delivery_time
+  FROM global_electronics_retailer.sales
+  WHERE
+    order_number IS NOT NULL AND
+    order_date IS NOT NULL AND
+    delivery_date IS NOT NULL
+),
+year_avg As (
+  SELECT
+    EXTRACT(YEAR FROM order_date) AS years,
+    ROUND(AVG(delivery_time), 2) AS yearly_avg
+  FROM order_delivery
+  GROUP BY
+    years
+),
+year_month_avg AS (
+  SELECT
+    EXTRACT(YEAR FROM order_date) AS years,
+    EXTRACT(MONTH FROM order_date) AS months,
+    ROUND(AVG(delivery_time), 2) AS monthly_avg
+  FROM order_delivery
+  GROUP BY
+    years,
+    months
+)
+
+SELECT
+  ym.years,
+  ym.months,
+  ym.monthly_avg,
+  ya.yearly_avg,
+  CASE
+    WHEN ym.monthly_avg > ya.yearly_avg THEN 'Slower Than Year Avg'
+    WHEN ym.monthly_avg < ya.yearly_avg THEN 'Faster Than Year Avg'
+    ELSE 'Same As Year Avg'
+  END AS performance
+FROM year_avg AS ya
+INNER JOIN year_month_avg AS ym
+  ON ya.years = ym.years
+WHERE
+  ym.years BETWEEN 2016 AND 2020
+ORDER BY
+  ym.years,
+  ym.months
+```
+
+To understand the company's delivery performance, I calculated the average number of days between the order date and delivery date. I examined yearly averages to identify long-term changes and compared monthly averages against their respective yearly averages to identify periods with faster or slower deliveries.
+
+To avoid counting repeated line items as separate orders, I used distinct combinations of order number, order date, and delivery date before calculating the averages.
+
+#### Average Delivery Time by Year
+
+| Year | Average Delivery Time (Days) | Change from Previous Year (Days) |
+|---|---:|---:|
+| 2016 | 7.17 | — |
+| 2017 | 5.20 | -1.97 |
+| 2018 | 4.36 | -0.84 |
+| 2019 | 4.10 | -0.26 |
+| 2020 | 4.03 | -0.07 |
+
+**Key findings:**
+
+- Average delivery time decreased every year between 2016 and 2020.
+- The largest year-to-year reduction occurred between 2016 and 2017, when average delivery time fell by 1.97 days.
+- Average delivery time declined from 7.17 days in 2016 to 4.03 days in 2020, representing an overall reduction of approximately 43.8%.
+- The annual improvement became smaller over time, with the average falling by only 0.07 days between 2019 and 2020.
+
+These results indicate that deliveries generally became faster over the period analyzed, although the data alone does not establish the reasons for the improvement.
+
+#### Monthly Delivery Time Comparison
+
+I also compared monthly average delivery times with their respective yearly averages to identify months when deliveries were relatively slower or faster.
+
+| Year | Slowest Month | Average Days | Fastest Month | Average Days |
+|---|---|---:|---|---:|
+| 2016 | January | 8.44 | December | 6.32 |
+| 2017 | January | 5.90 | December | 4.76 |
+| 2018 | April | 5.60 | November | 4.11 |
+| 2019 | September | 4.30 | April | 3.76 |
+| 2020 | September | 4.19 | August | 3.51 |
+
+**Key findings:**
+
+- January recorded the longest average delivery times in both 2016 and 2017, while December recorded the shortest.
+- From 2018 to 2020, the months with the longest and shortest average delivery times varied.
+- Despite these monthly fluctuations, the yearly average continued to decline throughout the period.
+- A month being faster than its yearly average does not necessarily mean it was faster than the same month in another year. Monthly performance must be interpreted alongside the overall trend.
+
+#### Conclusion
+
+The analysis showed a consistent improvement in average delivery time from 2016 to 2020. The average fell from 7.17 days to 4.03 days, a reduction of approximately 43.8%.
+
+Although monthly delivery times fluctuated, the overall trend suggests that deliveries generally became faster over the period. The largest improvement occurred between 2016 and 2017, while delivery times appeared to stabilize around four days in 2019 and 2020.
+
+Further investigation would be needed to determine what caused this improvement, as the analysis identifies changes in delivery time rather than the operational factors behind them.
+
+**Note:** The analysis excludes records with missing order or delivery dates. It assumes that each order has consistent dates across its line items, and the averages represent orders with valid date information.
+
 
