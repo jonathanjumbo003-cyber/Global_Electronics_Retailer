@@ -1,0 +1,51 @@
+-- Change in average delivery time over time
+
+WITH order_delivery AS (
+  SELECT DISTINCT
+    order_number,
+    order_date,
+    delivery_date,
+    DATE_DIFF(delivery_date, order_date, DAY) AS delivery_time
+  FROM global_electronics_retailer.sales
+  WHERE
+    order_number IS NOT NULL AND
+    order_date IS NOT NULL AND
+    delivery_date IS NOT NULL
+),
+year_avg As (
+  SELECT
+    EXTRACT(YEAR FROM order_date) AS years,
+    ROUND(AVG(delivery_time), 2) AS yearly_avg
+  FROM order_delivery
+  GROUP BY
+    years
+),
+year_month_avg AS (
+  SELECT
+    EXTRACT(YEAR FROM order_date) AS years,
+    EXTRACT(MONTH FROM order_date) AS months,
+    ROUND(AVG(delivery_time), 2) AS monthly_avg
+  FROM order_delivery
+  GROUP BY
+    years,
+    months
+)
+
+SELECT
+  ym.years,
+  ym.months,
+  ym.monthly_avg,
+  ya.yearly_avg,
+  CASE
+    WHEN ym.monthly_avg > ya.yearly_avg THEN 'Slower Than Year Avg'
+    WHEN ym.monthly_avg < ya.yearly_avg THEN 'Faster Than Year Avg'
+    ELSE 'Same As Year Avg'
+  END AS performance
+FROM year_avg AS ya
+INNER JOIN year_month_avg AS ym
+  ON ya.years = ym.years
+WHERE
+  ym.years BETWEEN 2016 AND 2020
+ORDER BY
+  ym.years,
+  ym.months
