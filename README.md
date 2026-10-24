@@ -1,5 +1,24 @@
 # Global_Electronics_Retailer
 
+## Introduction
+
+In this project, I used SQL to analyze Maven Analytics' Global Electronics Retailer dataset. The goal was to explore customer locations, product demand, sales trends, delivery performance, and differences in average order value between online and in-store sales.
+
+## Background
+
+The dataset contains sales transactions, customer details, product information, store records, and exchange rates. I used these tables to investigate four key business questions:
+
+- What types of products does the company sell, and where are its customers located?
+- Are there seasonal patterns or trends in order volume and revenue?
+- How long does delivery take on average, and has it changed over time?
+- Is there a difference in average order value (AOV) between online and in-store sales?
+
+## Tools I Used
+
+- **SQL:** Data exploration, table joins, aggregations, Common Table Expressions (CTEs), date functions, and business analysis.
+- **Google BigQuery:** Querying and analyzing the dataset.
+- **GitHub:** Documenting the project, queries, and findings in Markdown.
+
 ## The Analysis
 
 ### 1. Product Types and Customer Locations
@@ -331,4 +350,113 @@ Further investigation would be needed to determine what caused this improvement,
 
 **Note:** The analysis excludes records with missing order or delivery dates. It assumes that each order has consistent dates across its line items, and the averages represent orders with valid date information.
 
+### 4. Average Order Value (AOV): Online vs. In-Store Sales
 
+```sql
+-- just a combined sql for online stores and in-stores
+
+WITH order_price AS (
+  SELECT
+    EXTRACT(YEAR FROM s.order_date) AS order_year,
+    s.order_number AS order_number,
+    CASE
+      WHEN s.store_key = 0 THEN 'Online'
+      ELSE 'In-store'
+    END AS sales_channel,
+    s.quantity * p.unit_price_usd AS line_value
+  FROM global_electronics_retailer.sales AS s
+  INNER JOIN global_electronics_retailer.products AS p
+    ON s.product_key = p.product_key
+  WHERE
+    s.order_date IS NOT NULL AND
+    s.order_number IS NOT NULL AND
+    s.store_key IS NOT NULL
+),
+transition AS (
+  SELECT
+    order_year,
+    order_number,
+    sales_channel,
+    SUM(line_value) AS order_price
+  FROM order_price
+  GROUP BY
+    order_year,
+    order_number,
+    sales_channel
+),
+year_aov AS (
+  SELECT
+    order_year,
+    sales_channel,
+    COUNT(*) AS total_orders,
+    AVG(order_price) AS aov
+  FROM transition
+  GROUP BY
+    order_year,
+    sales_channel
+)
+
+SELECT
+  order_year,
+  MAX(IF(sales_channel = 'Online', total_orders, NULL)) AS online_order,
+  ROUND(MAX(IF(sales_channel = 'Online', aov, NULL)), 2) AS online_aov,
+  MAX(IF(sales_channel = 'In-store', total_orders, NULL)) AS in_store_orders,
+  ROUND(MAX(IF(sales_channel = 'In-store', aov, NULL)), 2) AS in_store_aov,
+  ROUND(MAX(IF(sales_channel = 'In-store', aov, NULL)) - MAX(IF(sales_channel = 'Online', aov, NULL)), 2) AS in_store_aov_minus_online_store_aov
+FROM year_aov
+WHERE
+  order_year BETWEEN 2016 AND 2020
+GROUP BY
+  order_year
+ORDER BY
+  order_year
+```
+
+To investigate whether average order value differed between online and in-store sales, I calculated the estimated value of each order by multiplying the quantity sold by the listed USD unit price of each product. I then aggregated sales-line values into individual order values and calculated the average order value for each sales channel by year.
+
+#### Annual AOV Comparison
+
+| Year | Online AOV (USD) | In-Store AOV (USD) | Higher-AOV Channel | AOV Difference (USD) |
+|---|---:|---:|---|---:|
+| 2016 | $2,456.55 | $2,418.37 | Online | $38.18 |
+| 2017 | $2,156.05 | $2,288.67 | In-Store | $132.61 |
+| 2018 | $2,074.13 | $2,162.43 | In-Store | $88.30 |
+| 2019 | $1,948.40 | $2,028.53 | In-Store | $80.12 |
+| 2020 | $1,932.73 | $2,027.13 | In-Store | $94.40 |
+| 2021* | $2,070.85 | $2,093.09 | In-Store | $22.23 |
+
+*2021 contains only January and February in the available order-volume results and is therefore treated as a partial year.*
+
+The AOV difference is calculated as in-store AOV minus online AOV. A positive difference means in-store AOV was higher, while a negative difference means online AOV was higher.
+
+**Key findings:**
+
+- **In-store AOV was higher in four consecutive full years, from 2017 to 2020.** Online AOV was slightly higher in 2016, by $38.18.
+- The largest difference occurred in 2017, when in-store AOV exceeded online AOV by approximately $132.61.
+- In 2020, in-store AOV was $2,027.13 compared with online AOV of $1,932.73, a difference of $94.40.
+- Both channels experienced a decline in AOV between 2016 and 2020. Online AOV decreased by approximately 21.32%, while in-store AOV declined by approximately 16.18%.
+
+#### Conclusion
+
+The analysis found that in-store orders generally had a higher estimated average order value than online orders during 2017–2020. Online AOV was slightly higher in 2016, but the relationship reversed in the following year.
+
+The results also showed that estimated AOV declined across both channels from 2016 to 2020, with a larger percentage reduction in the online channel. This suggests that the listed-price value per order decreased over the period, although the analysis does not establish the reasons behind the change.
+
+**Limitation:** AOV was estimated using quantity multiplied by listed USD product prices. Transaction-specific prices, discounts, and other adjustments were not incorporated, so these figures should not be interpreted as confirmed actual customer spending. The 2021 results cover only part of the year and should not be compared directly with complete annual totals.
+
+## Conclusion
+
+This project allowed me to analyze the Global Electronics Retailer dataset using SQL and Google BigQuery to investigate customer distribution, product demand, sales trends, delivery performance, and average order value across online and in-store sales.
+
+The analysis revealed several key findings:
+
+- **Customer and product demand:** The United States had the highest number of purchasing customers and the largest sales volume among the eight countries analyzed. Computers was the leading product category, while Movie DVD was the top-selling subcategory by unit volume.
+- **Seasonal patterns:** Order volume and estimated revenue generally increased from 2016 to 2019, with December consistently representing a strong month and April a low-activity month. Both measures declined sharply in 2020, when the earlier monthly pattern changed.
+- **Delivery performance:** Average delivery time declined from 7.17 days in 2016 to 4.03 days in 2020, a reduction of approximately 43.8%. Although monthly delivery times fluctuated, the overall trend showed that deliveries became faster over the period.
+- **Online vs. in-store AOV:** In-store orders had a higher estimated average order value from 2017 through 2020, while online AOV was slightly higher in 2016. Both channels experienced declining estimated AOV between 2016 and 2020.
+
+Overall, this project strengthened my ability to use SQL to join multiple tables, aggregate data, calculate business metrics, compare trends over time, and translate query results into meaningful findings.
+
+The analysis also highlighted the importance of interpreting metrics carefully. Revenue and AOV were estimated using quantities and listed USD product prices, rather than verified transaction amounts. The findings identify patterns and differences in the available data but do not establish their underlying causes.
+
+This project improved my understanding of how data analysis can help businesses evaluate customer demand, monitor performance, and identify areas for further investigation.
