@@ -1,0 +1,173 @@
+-- AOV trend analysis for online stores
+
+WITH order_price AS (
+  SELECT
+    s.order_number AS order_number,
+    s.order_date AS order_date,
+    s.store_key AS store_key,
+    s.quantity AS quantity,
+    p.unit_price_usd AS unit_price_usd,
+    s.quantity * p.unit_price_usd AS weighted_price
+  FROM global_electronics_retailer.sales AS s
+  INNER JOIN global_electronics_retailer.products AS p
+    ON s.product_key = p.product_key
+  WHERE
+    order_date IS NOT NULL
+),
+year_aov AS (
+  SELECT
+    EXTRACT(YEAR FROM order_date) AS years,
+    ROUND(SAFE_DIVIDE(SUM(weighted_price), COUNT(DISTINCT order_number)), 2) AS yearly_aov
+  FROM order_price
+  WHERE
+    store_key = 0
+  GROUP BY
+    years
+),
+year_month_aov AS (
+  SELECT
+    EXTRACT(YEAR FROM order_date) AS years,
+    EXTRACT(MONTH FROM order_date) AS months,
+    ROUND(SAFE_DIVIDE(SUM(weighted_price), COUNT(DISTINCT order_number)), 2) AS monthly_aov
+  FROM order_price
+  WHERE
+    store_key = 0
+  GROUP BY
+    years,
+    months
+)
+
+SELECT
+  ym.years,
+  ym.months,
+  ym.monthly_aov,
+  ya.yearly_aov,
+  CASE
+    WHEN ym.monthly_aov > ya.yearly_aov THEN 'Higher Than Yearly AOV'
+    WHEN ym.monthly_aov < ya.yearly_aov THEN 'Lower Than Yearly AOV'
+    ELSE 'Same As Yearly AOV'
+  END AS comparison
+FROM year_aov AS ya
+INNER JOIN year_month_aov AS ym
+  ON ya.years = ym.years
+WHERE
+  ym.years BETWEEN 2016 AND 2020
+ORDER BY
+  years,
+  months;
+
+-- AOV trend analysis for in-stores
+
+WITH order_price AS (
+  SELECT
+    s.order_number AS order_number,
+    s.order_date AS order_date,
+    s.store_key AS store_key,
+    s.quantity AS quantity,
+    p.unit_price_usd AS unit_price_usd,
+    s.quantity * p.unit_price_usd AS weighted_price
+  FROM global_electronics_retailer.sales AS s
+  INNER JOIN global_electronics_retailer.products AS p
+    ON s.product_key = p.product_key
+  WHERE
+    order_date IS NOT NULL
+),
+year_aov AS (
+  SELECT
+    EXTRACT(YEAR FROM order_date) AS years,
+    ROUND(SAFE_DIVIDE(SUM(weighted_price), COUNT(DISTINCT order_number)), 2) AS yearly_aov
+  FROM order_price
+  WHERE
+    store_key <> 0
+  GROUP BY
+    years
+),
+year_month_aov AS (
+  SELECT
+    EXTRACT(YEAR FROM order_date) AS years,
+    EXTRACT(MONTH FROM order_date) AS months,
+    ROUND(SAFE_DIVIDE(SUM(weighted_price), COUNT(DISTINCT order_number)), 2) AS monthly_aov
+  FROM order_price
+  WHERE
+    store_key <> 0
+  GROUP BY
+    years,
+    months
+)
+
+SELECT
+  ym.years,
+  ym.months,
+  ym.monthly_aov,
+  ya.yearly_aov,
+  CASE
+    WHEN ym.monthly_aov > ya.yearly_aov THEN 'Higher Than Yearly AOV'
+    WHEN ym.monthly_aov < ya.yearly_aov THEN 'Lower Than Yearly AOV'
+    ELSE 'Same As Yearly AOV'
+  END AS comparison
+FROM year_aov AS ya
+INNER JOIN year_month_aov AS ym
+  ON ya.years = ym.years
+WHERE
+  ym.years BETWEEN 2016 AND 2020
+ORDER BY
+  years,
+  months;
+
+-- just a combined sql for online stores and in-stores
+
+WITH order_price AS (
+  SELECT
+    EXTRACT(YEAR FROM s.order_date) AS order_year,
+    s.order_number AS order_number,
+    CASE
+      WHEN s.store_key = 0 THEN 'Online'
+      ELSE 'In-store'
+    END AS sales_channel,
+    s.quantity * p.unit_price_usd AS line_value
+  FROM global_electronics_retailer.sales AS s
+  INNER JOIN global_electronics_retailer.products AS p
+    ON s.product_key = p.product_key
+  WHERE
+    s.order_date IS NOT NULL AND
+    s.order_number IS NOT NULL AND
+    s.store_key IS NOT NULL
+),
+transition AS (
+  SELECT
+    order_year,
+    order_number,
+    sales_channel,
+    SUM(line_value) AS order_price
+  FROM order_price
+  GROUP BY
+    order_year,
+    order_number,
+    sales_channel
+),
+year_aov AS (
+  SELECT
+    order_year,
+    sales_channel,
+    COUNT(*) AS total_orders,
+    AVG(order_price) AS aov
+  FROM transition
+  GROUP BY
+    order_year,
+    sales_channel
+)
+
+SELECT
+  order_year,
+  MAX(IF(sales_channel = 'Online', total_orders, NULL)) AS online_order,
+  ROUND(MAX(IF(sales_channel = 'Online', aov, NULL)), 2) AS online_aov,
+  MAX(IF(sales_channel = 'In-store', total_orders, NULL)) AS in_store_orders,
+  ROUND(MAX(IF(sales_channel = 'In-store', aov, NULL)), 2) AS in_store_aov,
+  ROUND(MAX(IF(sales_channel = 'In-store', aov, NULL)) - MAX(IF(sales_channel = 'Online', aov, NULL)), 2) AS in_store_aov_minus_online_store_aov
+FROM year_aov
+WHERE
+  order_year BETWEEN 2016 AND 2020
+GROUP BY
+  order_year
+ORDER BY
+  order_year
